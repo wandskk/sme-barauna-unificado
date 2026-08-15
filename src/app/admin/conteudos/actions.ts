@@ -1,15 +1,11 @@
 "use server";
 
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
-import { authOptions, toAuthContext } from "@/server/auth";
+import { requireAuthContext } from "@/server/auth";
 import { createContent, deleteContent } from "@/server/repositories/contentRepository";
-import { ForbiddenError } from "@/core/auth/permissions";
 
 export async function createContentAction(formData: FormData) {
-  const session = await getServerSession(authOptions);
-  const ctx = session ? toAuthContext(session) : null;
-  if (!ctx) throw new ForbiddenError("Faça login para continuar.");
+  const ctx = await requireAuthContext();
 
   await createContent(ctx, {
     section: String(formData.get("section") ?? "geral"),
@@ -23,9 +19,7 @@ export async function createContentAction(formData: FormData) {
 }
 
 export async function deleteContentAction(id: string) {
-  const session = await getServerSession(authOptions);
-  const ctx = session ? toAuthContext(session) : null;
-  if (!ctx) throw new ForbiddenError("Faça login para continuar.");
+  const ctx = await requireAuthContext();
 
   await deleteContent(ctx, id);
   revalidatePath("/admin/conteudos");

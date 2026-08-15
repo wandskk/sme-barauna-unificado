@@ -9,7 +9,7 @@ export default async function AdminConteudosPage() {
   const items = await listPublishedContent().catch(() => []);
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
+    <main className="max-w-4xl">
       <h1 className="mb-6 text-xl font-semibold text-slate-900">Conteúdos do portal</h1>
 
       <form action={createContentAction} className="mb-8 space-y-3 rounded-lg border p-5">

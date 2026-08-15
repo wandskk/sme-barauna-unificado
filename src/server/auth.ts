@@ -1,8 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
+import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/server/db";
-import type { AuthContext } from "@/core/auth/permissions";
+import { AuthContext, ForbiddenError } from "@/core/auth/permissions";
 import type { Role } from "@/core/auth/roles";
 
 // Configuração do NextAuth. Único arquivo que sabe que a autenticação usa
@@ -73,4 +74,12 @@ export function toAuthContext(session: {
     role: session.user.role,
     schoolId: session.user.schoolId ?? null,
   };
+}
+
+/** Usado em Server Actions: pega a sessão atual e lança ForbiddenError se não houver login. */
+export async function requireAuthContext(): Promise<AuthContext> {
+  const session = await getServerSession(authOptions);
+  const ctx = session ? toAuthContext(session) : null;
+  if (!ctx) throw new ForbiddenError("Faça login para continuar.");
+  return ctx;
 }
