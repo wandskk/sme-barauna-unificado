@@ -1,0 +1,367 @@
+// ============================================================================
+// SCHEMA UNIFICADO — Portal + Indicadores SME Baraúna
+// ------------------------------------------------------------------------
+// Este schema unifica três sistemas que hoje vivem separados no projeto
+// legado ("SITE SME"):
+//   1. Site institucional (portal público + CMS)
+//   2. SPADEB — avaliações de múltipla escolha (Português/Matemática)
+//   3. Fluência Leitora — avaliações de nível de leitura
+//
+// DECISÃO DE DESIGN: em vez de manter dois sistemas de "avaliação" com
+// tabelas paralelas (assessment_* vs reading_fluency / fluencia_*), este
+// schema usa um modelo único de "Programa de Avaliação" (AssessmentProgram)
+// e "Avaliação" (Assessment). Cada avaliação pertence a um programa, e o
+// programa determina COMO o resultado é registrado (nota objetiva x nível
+// de fluência) via o campo `resultType` + tabela de resultado polimórfica
+// (AssessmentResult com campos opcionais para cada tipo). Isso permite:
+//   - Escolas, turmas, alunos, professores, coordenadores e anos letivos
+//     cadastrados UMA ÚNICA VEZ, reutilizados por qualquer programa.
+//   - Adicionar um terceiro tipo de avaliação no futuro sem duplicar
+//     School/Class/Student outra vez.
+//   - Dashboards e relatórios cruzarem dados dos dois programas pela mesma
+//     Escola/Turma/Aluno.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 1. ACESSO E PERMISSÕES
+// ---------------------------------------------------------------------------
+// Três papéis, conforme definido pelo dono do projeto:
+//   SECRETARIA  — acesso total (visão de rede, todos os indicadores, todas
+//                 as escolas). Equivalente a "administrador geral".
+//   ADMIN       — pode criar/editar/excluir conteúdo institucional e dados
+//                 de indicadores (mesmo nível de escrita que SECRETARIA
+//                 hoje; os dois papéis são mantidos separados para permitir
+//                 no futuro diferenciar o que cada um pode fazer, mas por
+//                 regra atual: só SECRETARIA/ADMIN criam informação nova).
+//   ESCOLA      — um usuário por escola. Só enxerga os dados DA SUA escola
+//                 e só pode VALIDAR informação já lançada (não cria dados
+//                 novos). Aplicado tanto na UI quanto nas regras de acesso
+//                 ao banco (ver docs/ARCHITECTURE.md, seção "Autorização").
+enum UserRole {
+  SECRETARIA
+  ADMIN
+  ESCOLA
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          UserRole
+  // Preenchido apenas quando role = ESCOLA: vincula o usuário a UMA escola.
+  schoolId      String?
+  school        School?   @relation(fields: [schoolId], references: [id])
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contentsAuthored Content[] @relation("ContentAuthor")
+  newsAuthored     News[]    @relation("NewsAuthor")
+  validations      SchoolValidation[]
+
+  @@index([schoolId])
+}
+
+// ---------------------------------------------------------------------------
+// 2. ESCOLAS, TURMAS, PESSOAS — cadastro único, compartilhado por todos os
+//    módulos (institucional + os dois programas de avaliação).
+// ---------------------------------------------------------------------------
+model School {
+  id          String   @id @default(cuid())
+  name        String
+  type        String?  // ex.: "Municipal", "Creche", "EJA" — livre, definido pela secretaria
+  zone        String   @default("urbana") // urbana | rural
+  address     String?
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  idebGoal    Decimal? @db.Decimal(3, 1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  classes      Class[]
+  reports      Report[]
+  validations  SchoolValidation[]
+
+  @@map("schools")
+}
+
+model SchoolYear {
+  id        String   @id @default(cuid())
+  year      Int      @unique
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  classes Class[]
+
+  @@map("school_years")
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  classes Class[]
+
+  @@map("teachers")
+}
+
+model Coordinator {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  classes Class[]
+
+  @@map("coordinators")
+}
+
+model Class {
+  id            String   @id @default(cuid())
+  name          String   // ex.: "5º Ano A"
+  grade         String   // série/ano escolar
+  shift         String   @default("manha") // manha | tarde | integral
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId     String?
+  teacher       Teacher? @relation(fields: [teacherId], references: [id])
+  coordinatorId String?
+  coordinator   Coordinator? @relation(fields: [coordinatorId], references: [id])
+  schoolYearId  String?
+  schoolYear    SchoolYear? @relation(fields: [schoolYearId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  students Student[]
+  results  AssessmentResult[]
+
+  @@unique([schoolId, grade, shift, name, schoolYearId], name: "class_identity")
+  @@index([schoolId])
+  @@map("classes")
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  name          String
+  schoolId      String
+  classId       String
+  class         Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  specialNeeds  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  results AssessmentResult[]
+
+  @@index([classId])
+  @@index([schoolId])
+  @@map("students")
+}
+
+// ---------------------------------------------------------------------------
+// 3. PROGRAMAS E AVALIAÇÕES — modelo único para SPADEB e Fluência Leitora
+// ---------------------------------------------------------------------------
+
+// Como um resultado é interpretado. Novos programas no futuro reutilizam um
+// destes dois tipos, ou adicionam um terceiro sem quebrar o schema.
+enum ResultType {
+  OBJECTIVE_SCORE // acertos/total por disciplina (modelo SPADEB)
+  READING_LEVEL   // nível de fluência leitora (Pré-Leitor 1..4, Leitor Iniciante, Leitor Fluente)
+}
+
+model AssessmentProgram {
+  id          String     @id @default(cuid())
+  code        String     @unique // ex.: "SPADEB", "FLUENCIA_LEITORA"
+  name        String
+  description String?
+  resultType  ResultType
+  isDefault   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  assessments Assessment[]
+
+  @@map("assessment_programs")
+}
+
+model Assessment {
+  id             String   @id @default(cuid())
+  programId      String
+  program        AssessmentProgram @relation(fields: [programId], references: [id])
+  name           String
+  year           Int
+  grade          String?
+  subject        String?  // usado em programas OBJECTIVE_SCORE (Português/Matemática/Ambas)
+  totalQuestions Int?     // usado em programas OBJECTIVE_SCORE
+  assessmentDate DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  answerKeys AssessmentAnswerKey[]
+  results    AssessmentResult[]
+
+  @@index([programId])
+  @@map("assessments")
+}
+
+// Só usado por programas OBJECTIVE_SCORE (gabaritos de múltipla escolha).
+model AssessmentAnswerKey {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  name         String
+  subject      String?
+  questions    Json       // [{ number, correctOption }]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("assessment_answer_keys")
+}
+
+// Resultado polimórfico: os campos usados dependem do resultType do
+// programa da avaliação. Alternativa a duas tabelas separadas — mantém
+// dashboards e relatórios cruzados simples (um único JOIN em vez de UNION).
+model AssessmentResult {
+  id             String     @id @default(cuid())
+  assessmentId   String
+  assessment     Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  schoolId       String
+  classId        String
+  class          Class      @relation(fields: [classId], references: [id])
+  studentId      String
+  student        Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  participated   Boolean    @default(true)
+
+  // --- campos usados quando program.resultType = OBJECTIVE_SCORE ---
+  correctPortuguese Int?
+  correctMath       Int?
+  totalCorrect      Int?
+  totalQuestions    Int?
+  percentage        Decimal? @db.Decimal(5, 2)
+  classification    String?  // "Abaixo do Básico" | "Proficiente" | "Avançado"
+  answers           Json?
+
+  // --- campo usado quando program.resultType = READING_LEVEL ---
+  readingLevel      String?  // ver src/core/assessments/readingLevels.ts
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([assessmentId, studentId], name: "result_identity")
+  @@index([schoolId])
+  @@index([classId])
+  @@map("assessment_results")
+}
+
+// Registro de que uma escola validou/confirmou os dados de uma avaliação —
+// é a única "escrita" que o papel ESCOLA pode fazer.
+model SchoolValidation {
+  id           String     @id @default(cuid())
+  schoolId     String
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assessmentId String
+  validatedById String
+  validatedBy  User       @relation(fields: [validatedById], references: [id])
+  note         String?
+  validatedAt  DateTime   @default(now())
+
+  @@unique([schoolId, assessmentId])
+  @@map("school_validations")
+}
+
+// ---------------------------------------------------------------------------
+// 4. SITE INSTITUCIONAL — gerenciado só por ADMIN/SECRETARIA
+// ---------------------------------------------------------------------------
+model Section {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  path      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  subsections Subsection[]
+
+  @@map("sections")
+}
+
+model Subsection {
+  id        String   @id @default(cuid())
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  key       String
+  label     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("subsections")
+}
+
+model Content {
+  id            String    @id @default(cuid())
+  section       String
+  title         String
+  description   String?
+  content       String?
+  contentType   String    @default("publicacao")
+  category      String?
+  imageUrl      String?
+  images        Json?
+  fileUrl       String?
+  fileType      String?
+  externalLink  String?
+  buttonLabel   String?
+  featured      Boolean   @default(false)
+  pinned        Boolean   @default(false)
+  published     Boolean   @default(true)
+  publishedAt   DateTime?
+  viewCount     Int       @default(0)
+  createdById   String?
+  createdBy     User?     @relation("ContentAuthor", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("contents")
+}
+
+model News {
+  id          String    @id @default(cuid())
+  title       String
+  content     String?
+  imageUrl    String?
+  published   Boolean   @default(true)
+  publishedAt DateTime?
+  createdById String?
+  createdBy   User?     @relation("NewsAuthor", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("news")
+}
+
+model Report {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  type        String
+  year        Int
+  author      String?
+  fileUrl     String?
+  fileType    String?
+  schoolId    String?
+  school      School?   @relation(fields: [schoolId], references: [id])
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("reports")
+}
