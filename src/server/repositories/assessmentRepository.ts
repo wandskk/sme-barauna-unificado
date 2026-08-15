@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db";
 import { AuthContext, assertSchoolScope, assertCanWriteIndicators } from "@/core/auth/permissions";
 import { scoreObjectiveResult } from "@/core/assessments/scoring";
+import { READING_LEVELS } from "@/core/assessments/readingLevels";
 
 /**
  * Repositório dos indicadores — cobre os dois programas (SPADEB e Fluência
@@ -111,6 +112,52 @@ export async function recordReadingLevel(
     create: input,
     update: input,
   });
+}
+
+/** Agregação por escola para o dashboard público (/indicadores) — um gráfico por avaliação. */
+export async function getAssessmentSummaryBySchool(assessmentId: string) {
+  const assessment = await prisma.assessment.findUniqueOrThrow({
+    where: { id: assessmentId },
+    include: { program: true },
+  });
+
+  const results = await prisma.assessmentResult.findMany({
+    where: { assessmentId, participated: true },
+    include: { class: { include: { school: true } } },
+  });
+
+  const bySchool = new Map<string, { schoolName: string; results: typeof results }>();
+  for (const r of results) {
+    const key = r.class.schoolId;
+    if (!bySchool.has(key)) bySchool.set(key, { schoolName: r.class.school.name, results: [] });
+    bySchool.get(key)!.results.push(r);
+  }
+
+  if (assessment.program.resultType === "OBJECTIVE_SCORE") {
+    const rows = [...bySchool.values()].map(({ schoolName, results }) => {
+      const avgPercentage =
+        results.reduce((sum, r) => sum + Number(r.percentage ?? 0), 0) / (results.length || 1);
+      return {
+        schoolName,
+        studentCount: results.length,
+        avgPercentage: Math.round(avgPercentage * 100) / 100,
+        abaixoDoBasico: results.filter((r) => r.classification === "Abaixo do Básico").length,
+        proficiente: results.filter((r) => r.classification === "Proficiente").length,
+        avancado: results.filter((r) => r.classification === "Avançado").length,
+      };
+    });
+    return { assessment, resultType: "OBJECTIVE_SCORE" as const, rows };
+  }
+
+  const rows = [...bySchool.values()].map(({ schoolName, results }) => {
+    const counts: Record<string, number> = {};
+    for (const level of READING_LEVELS) counts[level.code] = 0;
+    for (const r of results) {
+      if (r.readingLevel && counts[r.readingLevel] !== undefined) counts[r.readingLevel]++;
+    }
+    return { schoolName, studentCount: results.length, ...counts };
+  });
+  return { assessment, resultType: "READING_LEVEL" as const, rows };
 }
 
 /** Avaliações com resultados lançados para a escola, e se já foram validadas — usado em /painel/validar. */
