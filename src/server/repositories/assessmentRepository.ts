@@ -15,6 +15,50 @@ export async function listProgramsWithAssessments() {
   });
 }
 
+export async function listPrograms() {
+  return prisma.assessmentProgram.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function listAssessments() {
+  return prisma.assessment.findMany({
+    include: { program: true },
+    orderBy: [{ year: "desc" }, { name: "asc" }],
+  });
+}
+
+export async function getAssessment(id: string) {
+  return prisma.assessment.findUniqueOrThrow({ where: { id }, include: { program: true } });
+}
+
+export async function createAssessment(
+  ctx: AuthContext,
+  input: {
+    programId: string;
+    name: string;
+    year: number;
+    grade?: string;
+    subject?: string;
+    totalQuestions?: number;
+  }
+) {
+  assertCanWriteIndicators(ctx);
+  return prisma.assessment.create({ data: input });
+}
+
+export async function deleteAssessment(ctx: AuthContext, id: string) {
+  assertCanWriteIndicators(ctx);
+  return prisma.assessment.delete({ where: { id } });
+}
+
+/** Usado no lançamento (Secretaria/Admin): resultados já lançados para uma turma, sem exigir escopo de escola. */
+export async function listResultsForClass(assessmentId: string, classId: string) {
+  return prisma.assessmentResult.findMany({
+    where: { assessmentId, classId },
+    include: { student: true },
+    orderBy: { student: { name: "asc" } },
+  });
+}
+
 export async function listResultsForSchool(ctx: AuthContext, schoolId: string, assessmentId: string) {
   assertSchoolScope(ctx, schoolId);
   return prisma.assessmentResult.findMany({
@@ -67,6 +111,32 @@ export async function recordReadingLevel(
     create: input,
     update: input,
   });
+}
+
+/** Avaliações com resultados lançados para a escola, e se já foram validadas — usado em /painel/validar. */
+export async function listAssessmentsForValidation(ctx: AuthContext, schoolId: string) {
+  assertSchoolScope(ctx, schoolId);
+  const results = await prisma.assessmentResult.findMany({
+    where: { schoolId },
+    distinct: ["assessmentId"],
+    select: { assessmentId: true },
+  });
+  const assessmentIds = results.map((r) => r.assessmentId);
+  if (assessmentIds.length === 0) return [];
+
+  const [assessments, validations] = await Promise.all([
+    prisma.assessment.findMany({
+      where: { id: { in: assessmentIds } },
+      include: { program: true },
+      orderBy: [{ year: "desc" }, { name: "asc" }],
+    }),
+    prisma.schoolValidation.findMany({ where: { schoolId, assessmentId: { in: assessmentIds } } }),
+  ]);
+
+  return assessments.map((a) => ({
+    assessment: a,
+    validation: validations.find((v) => v.assessmentId === a.id) ?? null,
+  }));
 }
 
 /** Única escrita permitida ao papel ESCOLA: confirmar que os dados lançados estão corretos. */

@@ -8,6 +8,7 @@ const CARDS = [
   { href: "/admin/professores", label: "Professores", count: () => prisma.teacher.count() },
   { href: "/admin/coordenadores", label: "Coordenadores", count: () => prisma.coordinator.count() },
   { href: "/admin/anos-letivos", label: "Anos letivos", count: () => prisma.schoolYear.count() },
+  { href: "/admin/avaliacoes", label: "Avaliações", count: () => prisma.assessment.count() },
   { href: "/admin/conteudos", label: "Conteúdos do portal", count: () => prisma.content.count() },
 ];
 
@@ -29,6 +30,13 @@ export default async function AdminHomePage() {
           </Link>
         ))}
       </div>
+
+      <Link
+        href="/painel/lancamento"
+        className="mt-6 inline-block text-sm text-primary underline"
+      >
+        Lançar resultados de avaliações →
+      </Link>
     </div>
   );
 }

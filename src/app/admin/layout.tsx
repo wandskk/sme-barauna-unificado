@@ -8,6 +8,7 @@ const NAV = [
   { href: "/admin/professores", label: "Professores" },
   { href: "/admin/coordenadores", label: "Coordenadores" },
   { href: "/admin/anos-letivos", label: "Anos letivos" },
+  { href: "/admin/avaliacoes", label: "Avaliações" },
   { href: "/admin/conteudos", label: "Conteúdos" },
 ];
 

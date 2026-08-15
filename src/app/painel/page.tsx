@@ -9,7 +9,7 @@ export default async function PainelPage() {
   if (ctx.role !== "ESCOLA" || !ctx.schoolId) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-10">
-        <p className="text-sm text-slate-600">
+        <p className="mb-4 text-sm text-slate-600">
           Esta área é destinada aos usuários do papel Escola. Você está logado como{" "}
           {ctx.role === "SECRETARIA" ? "Secretaria" : "Administrador"} —{" "}
           <Link href="/admin" className="text-primary underline">
@@ -17,6 +17,9 @@ export default async function PainelPage() {
           </Link>
           .
         </p>
+        <Link href="/painel/lancamento" className="text-sm text-primary underline">
+          Ir para o lançamento de indicadores
+        </Link>
       </main>
     );
   }
@@ -47,10 +50,12 @@ export default async function PainelPage() {
         )}
       </ul>
 
-      <p className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
-        Lançamento e validação de indicadores por turma ainda não estão disponíveis nesta tela —
-        em desenvolvimento.
-      </p>
+      <Link
+        href="/painel/validar"
+        className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-white"
+      >
+        Validar indicadores lançados
+      </Link>
     </main>
   );
 }
