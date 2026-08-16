@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listClasses } from "@/server/repositories/classRepository";
 import { listSchools } from "@/server/repositories/schoolRepository";
 import { listTeachers } from "@/server/repositories/teacherRepository";
@@ -79,11 +80,16 @@ export default async function AdminTurmasPage() {
                 {c.schoolYear ? ` · ${c.schoolYear.year}` : ""}
               </p>
             </div>
-            <form action={deleteClassAction.bind(null, c.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/turmas/${c.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteClassAction.bind(null, c.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {classes.length === 0 && (

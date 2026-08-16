@@ -27,6 +27,10 @@ export async function listPublishedContent(section?: string): Promise<ContentSum
   });
 }
 
+export async function getContent(id: string) {
+  return prisma.content.findUniqueOrThrow({ where: { id } });
+}
+
 export async function createContent(ctx: AuthContext, input: ContentInput) {
   assertCanManageInstitutionalContent(ctx);
   return prisma.content.create({

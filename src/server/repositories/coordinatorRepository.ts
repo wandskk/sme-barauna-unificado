@@ -10,6 +10,15 @@ export async function createCoordinator(ctx: AuthContext, input: { name: string 
   return prisma.coordinator.create({ data: input });
 }
 
+export async function getCoordinator(id: string) {
+  return prisma.coordinator.findUniqueOrThrow({ where: { id } });
+}
+
+export async function updateCoordinator(ctx: AuthContext, id: string, input: { name: string }) {
+  assertCanWriteIndicators(ctx);
+  return prisma.coordinator.update({ where: { id }, data: input });
+}
+
 export async function deleteCoordinator(ctx: AuthContext, id: string) {
   assertCanWriteIndicators(ctx);
   return prisma.coordinator.delete({ where: { id } });

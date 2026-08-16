@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listAssessments, listPrograms } from "@/server/repositories/assessmentRepository";
 import { createAssessmentAction, deleteAssessmentAction } from "./actions";
 
@@ -54,11 +55,16 @@ export default async function AdminAvaliacoesPage() {
                 {a.subject ? ` · ${a.subject}` : ""}
               </p>
             </div>
-            <form action={deleteAssessmentAction.bind(null, a.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/avaliacoes/${a.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteAssessmentAction.bind(null, a.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {assessments.length === 0 && (

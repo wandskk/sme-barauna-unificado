@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listCoordinators } from "@/server/repositories/coordinatorRepository";
 import { createCoordinatorAction, deleteCoordinatorAction } from "./actions";
 
@@ -23,11 +24,16 @@ export default async function AdminCoordenadoresPage() {
         {coordinators.map((c) => (
           <li key={c.id} className="flex items-center justify-between rounded-md border bg-white px-4 py-3">
             <span className="text-sm text-slate-800">{c.name}</span>
-            <form action={deleteCoordinatorAction.bind(null, c.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/coordenadores/${c.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteCoordinatorAction.bind(null, c.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {coordinators.length === 0 && (

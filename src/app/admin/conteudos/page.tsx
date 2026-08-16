@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listPublishedContent } from "@/server/repositories/contentRepository";
 import { createContentAction, deleteContentAction } from "./actions";
 
@@ -29,11 +30,16 @@ export default async function AdminConteudosPage() {
         {items.map((item) => (
           <li key={item.id} className="flex items-center justify-between rounded-md border px-4 py-3">
             <span className="text-sm text-slate-800">{item.title}</span>
-            <form action={deleteContentAction.bind(null, item.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/conteudos/${item.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteContentAction.bind(null, item.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
       </ul>

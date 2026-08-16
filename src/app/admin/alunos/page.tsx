@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listStudents } from "@/server/repositories/studentRepository";
 import { listClasses } from "@/server/repositories/classRepository";
 import { createStudentAction, deleteStudentAction } from "./actions";
@@ -43,11 +44,16 @@ export default async function AdminAlunosPage() {
               <p className="text-sm font-medium text-slate-900">{s.name}</p>
               <p className="text-xs text-slate-500">{s.class.name}</p>
             </div>
-            <form action={deleteStudentAction.bind(null, s.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/alunos/${s.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteStudentAction.bind(null, s.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {students.length === 0 && (

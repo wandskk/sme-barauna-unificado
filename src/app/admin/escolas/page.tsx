@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listSchools } from "@/server/repositories/schoolRepository";
 import { createSchoolAction, deleteSchoolAction } from "./actions";
 
@@ -34,11 +35,16 @@ export default async function AdminEscolasPage() {
                 {school.address ? ` · ${school.address}` : ""}
               </p>
             </div>
-            <form action={deleteSchoolAction.bind(null, school.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/escolas/${school.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteSchoolAction.bind(null, school.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {schools.length === 0 && (

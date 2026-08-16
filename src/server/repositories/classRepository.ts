@@ -30,6 +30,30 @@ export async function createClass(
   return prisma.class.create({ data: input });
 }
 
+export async function getClass(id: string) {
+  return prisma.class.findUniqueOrThrow({
+    where: { id },
+    include: { school: true, teacher: true, coordinator: true, schoolYear: true },
+  });
+}
+
+export async function updateClass(
+  ctx: AuthContext,
+  id: string,
+  input: {
+    name: string;
+    grade: string;
+    shift?: string;
+    schoolId: string;
+    teacherId?: string | null;
+    coordinatorId?: string | null;
+    schoolYearId?: string | null;
+  }
+) {
+  assertCanWriteIndicators(ctx);
+  return prisma.class.update({ where: { id }, data: input });
+}
+
 export async function deleteClass(ctx: AuthContext, id: string) {
   assertCanWriteIndicators(ctx);
   return prisma.class.delete({ where: { id } });

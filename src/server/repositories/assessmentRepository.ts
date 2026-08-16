@@ -46,6 +46,22 @@ export async function createAssessment(
   return prisma.assessment.create({ data: input });
 }
 
+export async function updateAssessment(
+  ctx: AuthContext,
+  id: string,
+  input: {
+    programId: string;
+    name: string;
+    year: number;
+    grade?: string;
+    subject?: string;
+    totalQuestions?: number;
+  }
+) {
+  assertCanWriteIndicators(ctx);
+  return prisma.assessment.update({ where: { id }, data: input });
+}
+
 export async function deleteAssessment(ctx: AuthContext, id: string) {
   assertCanWriteIndicators(ctx);
   return prisma.assessment.delete({ where: { id } });

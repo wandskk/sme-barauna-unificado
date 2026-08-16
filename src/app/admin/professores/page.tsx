@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listTeachers } from "@/server/repositories/teacherRepository";
 import { createTeacherAction, deleteTeacherAction } from "./actions";
 
@@ -23,11 +24,16 @@ export default async function AdminProfessoresPage() {
         {teachers.map((t) => (
           <li key={t.id} className="flex items-center justify-between rounded-md border bg-white px-4 py-3">
             <span className="text-sm text-slate-800">{t.name}</span>
-            <form action={deleteTeacherAction.bind(null, t.id)}>
-              <button type="submit" className="text-sm text-red-600 hover:underline">
-                Excluir
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              <Link href={`/admin/professores/${t.id}/editar`} className="text-sm text-primary hover:underline">
+                Editar
+              </Link>
+              <form action={deleteTeacherAction.bind(null, t.id)}>
+                <button type="submit" className="text-sm text-red-600 hover:underline">
+                  Excluir
+                </button>
+              </form>
+            </div>
           </li>
         ))}
         {teachers.length === 0 && (
