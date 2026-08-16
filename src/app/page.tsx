@@ -1,21 +1,26 @@
 import Link from "next/link";
 import { listPublishedContent } from "@/server/repositories/contentRepository";
+import { requireAuthContext } from "@/server/auth";
+import { SignOutLink } from "./SignOutLink";
 
-// Home institucional pública. Busca direto do repositório (Server Component
-// → sem API route intermediária; ver docs/ARCHITECTURE.md "Server Components
-// vs API routes").
+// Sistema privado: só acessível logado (ver src/middleware.ts — nenhuma rota
+// é pública). Busca direto do repositório (Server Component → sem API route
+// intermediária; ver docs/ARCHITECTURE.md "Server Components vs API routes").
 export default async function HomePage() {
+  const ctx = await requireAuthContext();
   const highlights = await listPublishedContent().catch(() => []);
+  const painelHref = ctx.role === "ESCOLA" ? "/painel" : "/admin";
 
   return (
     <main>
       <header className="border-b bg-primary text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-lg font-semibold">SME Baraúna</span>
-          <nav className="flex gap-6 text-sm">
+          <nav className="flex items-center gap-6 text-sm">
             <Link href="/">Início</Link>
             <Link href="/indicadores">Indicadores</Link>
-            <Link href="/login">Área restrita</Link>
+            <Link href={painelHref}>Painel</Link>
+            <SignOutLink />
           </nav>
         </div>
       </header>

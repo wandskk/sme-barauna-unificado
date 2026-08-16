@@ -1,7 +1,13 @@
 import { prisma } from "@/server/db";
 import { AuthContext, assertSchoolScope, assertCanWriteIndicators } from "@/core/auth/permissions";
-import { scoreObjectiveResult } from "@/core/assessments/scoring";
+import { scoreObjectiveResult, SPADEB_GOAL_PERCENTAGE } from "@/core/assessments/scoring";
 import { READING_LEVELS } from "@/core/assessments/readingLevels";
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+const GRADE_ORDER = ["2º Ano", "3º Ano", "4º Ano", "5º Ano", "6º Ano", "7º Ano", "8º Ano", "9º Ano"];
 
 /**
  * Repositório dos indicadores — cobre os dois programas (SPADEB e Fluência
@@ -130,7 +136,7 @@ export async function recordReadingLevel(
   });
 }
 
-/** Agregação por escola para o dashboard público (/indicadores) — um gráfico por avaliação. */
+/** Agregação por escola para o dashboard de indicadores (/indicadores) — um gráfico por avaliação. */
 export async function getAssessmentSummaryBySchool(assessmentId: string) {
   const assessment = await prisma.assessment.findUniqueOrThrow({
     where: { id: assessmentId },
@@ -175,6 +181,137 @@ export async function getAssessmentSummaryBySchool(assessmentId: string) {
     return { schoolName, studentCount: results.length, ...counts };
   });
   return { assessment, resultType: "READING_LEVEL" as const, rows };
+}
+
+/**
+ * Visão geral do programa inteiro (todas as avaliações), para o dashboard
+ * de indicadores (/indicadores) quando "Todas as avaliações" é selecionado —
+ * réplica das fórmulas do painel SPADEB legado (smebaraunarn.com/avaliacoes):
+ * média geral = média dos percentuais individuais ÷ 10; média global =
+ * total de acertos ÷ total de questões aplicadas; níveis pelos mesmos
+ * limiares de src/core/assessments/scoring.ts.
+ */
+export async function getProgramOverview(programId: string) {
+  const program = await prisma.assessmentProgram.findUniqueOrThrow({ where: { id: programId } });
+  const assessments = await prisma.assessment.findMany({
+    where: { programId },
+    include: { answerKeys: true },
+  });
+  const assessmentIds = assessments.map((a) => a.id);
+
+  const allResults = await prisma.assessmentResult.findMany({
+    where: { assessmentId: { in: assessmentIds } },
+    include: { class: { include: { school: true } } },
+  });
+  const results = allResults.filter((r) => r.participated);
+
+  const totalStudents = allResults.length;
+  const participatedCount = results.length;
+  const schoolIds = new Set(results.map((r) => r.class.schoolId));
+  const classIds = new Set(results.map((r) => r.classId));
+
+  if (program.resultType === "OBJECTIVE_SCORE") {
+    // Nº de questões por disciplina, extraído do gabarito de cada avaliação
+    // (fallback: metade/metade sobre o total, se não houver gabarito).
+    const subjectQuestionsByAssessment = new Map<string, { lp: number; mat: number }>();
+    for (const a of assessments) {
+      let lp = 0;
+      let mat = 0;
+      for (const key of a.answerKeys) {
+        const questions = (key.questions as unknown as { subject?: string }[]) ?? [];
+        for (const q of questions) {
+          if (q.subject === "LP") lp++;
+          else if (q.subject === "MAT") mat++;
+        }
+      }
+      if (lp === 0 && mat === 0 && a.totalQuestions) {
+        lp = Math.round(a.totalQuestions / 2);
+        mat = a.totalQuestions - lp;
+      }
+      subjectQuestionsByAssessment.set(a.id, { lp: lp || 1, mat: mat || 1 });
+    }
+
+    let sumPercentage = 0;
+    let sumCorrectTotal = 0;
+    let sumQuestionsTotal = 0;
+    let sumCorrectLp = 0;
+    let sumQuestionsLp = 0;
+    let sumCorrectMat = 0;
+    let sumQuestionsMat = 0;
+    const classification = { abaixoDoBasico: 0, basico: 0, proficiente: 0, avancado: 0 };
+    const bySchool = new Map<string, { name: string; sumPct: number; count: number }>();
+    const byGrade = new Map<string, { sumPct: number; count: number }>();
+
+    for (const r of results) {
+      sumPercentage += Number(r.percentage ?? 0);
+      sumCorrectTotal += r.totalCorrect ?? 0;
+      sumQuestionsTotal += r.totalQuestions ?? 0;
+
+      const sq = subjectQuestionsByAssessment.get(r.assessmentId) ?? { lp: 1, mat: 1 };
+      sumCorrectLp += r.correctPortuguese ?? 0;
+      sumQuestionsLp += sq.lp;
+      sumCorrectMat += r.correctMath ?? 0;
+      sumQuestionsMat += sq.mat;
+
+      if (r.classification === "Abaixo do Básico") classification.abaixoDoBasico++;
+      else if (r.classification === "Básico") classification.basico++;
+      else if (r.classification === "Proficiente") classification.proficiente++;
+      else if (r.classification === "Avançado") classification.avancado++;
+
+      const schoolId = r.class.schoolId;
+      const school = bySchool.get(schoolId) ?? { name: r.class.school.name, sumPct: 0, count: 0 };
+      school.sumPct += Number(r.percentage ?? 0);
+      school.count++;
+      bySchool.set(schoolId, school);
+
+      const grade = r.class.grade;
+      const g = byGrade.get(grade) ?? { sumPct: 0, count: 0 };
+      g.sumPct += Number(r.percentage ?? 0);
+      g.count++;
+      byGrade.set(grade, g);
+    }
+
+    const schoolRanking = [...bySchool.values()]
+      .map((s) => ({ schoolName: s.name, avgScore: round2(s.count ? s.sumPct / s.count / 10 : 0) }))
+      .sort((a, b) => b.avgScore - a.avgScore);
+
+    const gradePerformance = [...byGrade.entries()]
+      .map(([grade, g]) => ({ grade, avgScore: round2(g.count ? g.sumPct / g.count / 10 : 0) }))
+      .sort((a, b) => GRADE_ORDER.indexOf(a.grade) - GRADE_ORDER.indexOf(b.grade));
+
+    return {
+      resultType: "OBJECTIVE_SCORE" as const,
+      totalStudents,
+      totalSchools: schoolIds.size,
+      totalClasses: classIds.size,
+      avgScoreOutOf10: round2(participatedCount ? sumPercentage / participatedCount / 10 : 0),
+      avgGlobalPercent: round2(sumQuestionsTotal ? (sumCorrectTotal / sumQuestionsTotal) * 100 : 0),
+      goalPercent: SPADEB_GOAL_PERCENTAGE,
+      subjectAverages: {
+        portugues: round2(sumQuestionsLp ? (sumCorrectLp / sumQuestionsLp) * 100 : 0),
+        matematica: round2(sumQuestionsMat ? (sumCorrectMat / sumQuestionsMat) * 100 : 0),
+      },
+      classification,
+      schoolRanking,
+      gradePerformance,
+    };
+  }
+
+  const levelCounts: Record<string, number> = {};
+  for (const level of READING_LEVELS) levelCounts[level.code] = 0;
+  for (const r of results) {
+    if (r.readingLevel && levelCounts[r.readingLevel] !== undefined) levelCounts[r.readingLevel]++;
+  }
+
+  return {
+    resultType: "READING_LEVEL" as const,
+    totalStudents,
+    totalSchools: schoolIds.size,
+    totalClasses: classIds.size,
+    participatedCount,
+    participationRate: round2(totalStudents ? (participatedCount / totalStudents) * 100 : 0),
+    levelCounts,
+  };
 }
 
 /** Avaliações com resultados lançados para a escola, e se já foram validadas — usado em /painel/validar. */
