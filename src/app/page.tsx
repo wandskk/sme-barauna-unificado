@@ -10,6 +10,7 @@ export default async function HomePage() {
   const ctx = await requireAuthContext();
   const highlights = await listPublishedContent().catch(() => []);
   const painelHref = ctx.role === "ESCOLA" ? "/painel" : "/admin";
+  const indicadoresHref = ctx.role === "ESCOLA" ? "/painel/indicadores" : "/admin/indicadores";
 
   return (
     <main>
@@ -18,7 +19,7 @@ export default async function HomePage() {
           <span className="text-lg font-semibold">SME Baraúna</span>
           <nav className="flex items-center gap-6 text-sm">
             <Link href="/">Início</Link>
-            <Link href="/indicadores">Indicadores</Link>
+            <Link href={indicadoresHref}>Indicadores</Link>
             <Link href={painelHref}>Painel</Link>
             <SignOutLink />
           </nav>

@@ -12,6 +12,16 @@
 .env
 .env*.local
 
+# mcp (contains API keys)
+.mcp.json
+.agents/
+
+# local data backups / one-off scripts (may contain real student PII)
+/_backup/
+_inspect*.ts
+_backup_dump.ts
+_migrate*.ts
+
 # misc
 .DS_Store
 *.pem

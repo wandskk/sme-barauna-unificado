@@ -13,16 +13,23 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "import:sigeduc": "tsx scripts/importSigeduc.ts",
+    "import:sigeduc-frequencia": "tsx scripts/importSigeducFrequencia.ts",
+    "import:sigeduc-notas": "tsx scripts/importSigeducNotas.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.31.0",
     "next": "^14.2.35",
     "next-auth": "^4.24.7",
+    "next-themes": "^0.4.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
+    "tailwind-merge": "^3.6.0",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },

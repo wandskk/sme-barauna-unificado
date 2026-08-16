@@ -2,12 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-}
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --surface: 0 0% 100%;
+    --surface-subtle: 210 40% 96%;
+    --foreground: 222 38% 15%;
+    --muted-foreground: 215 16% 47%;
+    --border: 214 32% 91%;
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+    --primary: 175 77% 26%;
+    --primary-hover: 175 77% 22%;
+    --primary-soft: 166 91% 90%;
+
+    --secondary: 221 83% 53%;
+    --secondary-soft: 214 95% 93%;
+
+    --accent: 40 89% 61%;
+    --success: 139 58% 30%;
+    --warning: 31 89% 41%;
+    --danger: 0 57% 50%;
+    --info: 197 91% 36%;
+
+    --radius: 0.875rem;
+  }
+
+  .dark {
+    --background: 220 48% 8%;
+    --surface: 218 43% 12%;
+    --surface-subtle: 217 39% 15%;
+    --foreground: 210 40% 98%;
+    --muted-foreground: 217 21% 72%;
+    --border: 217 29% 22%;
+
+    --primary: 171 67% 50%;
+    --primary-hover: 168 76% 64%;
+    --primary-soft: 177 54% 15%;
+
+    --secondary: 213 94% 68%;
+    --secondary-soft: 216 57% 21%;
+
+    --accent: 41 89% 67%;
+    --success: 142 69% 58%;
+    --warning: 43 96% 56%;
+    --danger: 0 91% 71%;
+    --info: 198 93% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Accessibility Focus Rings */
+  :focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+
+  /* Respect reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

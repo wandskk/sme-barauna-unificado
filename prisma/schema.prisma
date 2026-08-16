@@ -85,6 +85,13 @@ model School {
   latitude    Decimal? @db.Decimal(9, 6)
   longitude   Decimal? @db.Decimal(9, 6)
   idebGoal    Decimal? @db.Decimal(3, 1)
+  // Identidade externa oficial (INEP) e o id interno da escola no SIGEduc/Educ21
+  // — usados para casar dados dessa integração (professores, matrícula,
+  // frequência) sem depender de comparar o campo `name` (livre, sem padrão).
+  // Nulos para escolas fora da rede municipal (estaduais/particulares), que o
+  // SIGEduc não cobre.
+  inepCode        String? @unique
+  sigeducSchoolId Int?    @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -110,6 +117,9 @@ model SchoolYear {
 model Teacher {
   id        String   @id @default(cuid())
   name      String
+  // Identidade externa (SIGEduc) — nulos para professores cadastrados manualmente.
+  matricula String?  @unique
+  cpf       String?  @unique
   createdAt DateTime @default(now())
 
   classes Class[]
@@ -120,6 +130,8 @@ model Teacher {
 model Coordinator {
   id        String   @id @default(cuid())
   name      String
+  matricula String?  @unique
+  cpf       String?  @unique
   createdAt DateTime @default(now())
 
   classes Class[]
@@ -140,6 +152,9 @@ model Class {
   coordinator   Coordinator? @relation(fields: [coordinatorId], references: [id])
   schoolYearId  String?
   schoolYear    SchoolYear? @relation(fields: [schoolYearId], references: [id])
+  // Código de turma do SIGEduc (ex.: "EFAIINT1B") — único por escola, usado
+  // para sincronizar turmas sem depender de nome/série/turno combinados.
+  sigeducTurmaCode String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -147,6 +162,7 @@ model Class {
   results  AssessmentResult[]
 
   @@unique([schoolId, grade, shift, name, schoolYearId], name: "class_identity")
+  @@unique([schoolId, sigeducTurmaCode], name: "sigeduc_turma_identity")
   @@index([schoolId])
   @@map("classes")
 }
@@ -158,10 +174,16 @@ model Student {
   classId       String
   class         Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   specialNeeds  String?
+  // Identidade externa (SIGEduc) — chave estável para cruzar o mesmo aluno
+  // entre programas (SPADEB x Fluência) em vez de casar por nome.
+  matricula     String?  @unique
+  cpf           String?  @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  results AssessmentResult[]
+  results     AssessmentResult[]
+  attendance  AttendanceRecord[]
+  grades      Grade[]
 
   @@index([classId])
   @@index([schoolId])
@@ -277,6 +299,53 @@ model SchoolValidation {
 
   @@unique([schoolId, assessmentId])
   @@map("school_validations")
+}
+
+// Frequência diária por aluno E disciplina, importada do SIGEduc (ver
+// scripts/importSigeducFrequencia.ts). Um registro por (aluno, dia,
+// disciplina) — permite ver frequência geral OU quebrada por matéria, igual
+// à tela de Notas.
+model AttendanceRecord {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId      String
+  schoolId     String
+  date         DateTime @db.Date
+  disciplina   String
+  totalAulas   Int
+  totalFaltas  Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([studentId, date, disciplina])
+  @@index([classId])
+  @@index([schoolId])
+  @@map("attendance_records")
+}
+
+// Nota do boletim escolar (por disciplina/bimestre), importada do SIGEduc
+// (ver scripts/importSigeducNotas.ts). Diferente de AssessmentResult: aqui é
+// a nota corrente da escola (várias por ano), lá é o resultado de uma
+// avaliação externa específica (SPADEB/Fluência) — propositalmente
+// separado, ver docs/ARCHITECTURE.md.
+model Grade {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId     String
+  schoolId    String
+  year        Int
+  disciplina  String
+  unidade     Int
+  nota        Decimal  @db.Decimal(4, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, disciplina, unidade, year])
+  @@index([classId])
+  @@index([schoolId])
+  @@map("grades")
 }
 
 // ---------------------------------------------------------------------------
