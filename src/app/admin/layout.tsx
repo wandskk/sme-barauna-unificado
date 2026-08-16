@@ -1,39 +1,27 @@
-import Link from "next/link";
-import { SignOutLink } from "../SignOutLink";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/server/auth";
+import { AppShell } from "@/components/layout/AppShell";
+import { Role } from "@/core/auth/roles";
 
-const NAV = [
-  { href: "/admin", label: "Início" },
-  { href: "/admin/escolas", label: "Escolas" },
-  { href: "/admin/turmas", label: "Turmas" },
-  { href: "/admin/alunos", label: "Alunos" },
-  { href: "/admin/professores", label: "Professores" },
-  { href: "/admin/coordenadores", label: "Coordenadores" },
-  { href: "/admin/anos-letivos", label: "Anos letivos" },
-  { href: "/admin/avaliacoes", label: "Avaliações" },
-  { href: "/admin/conteudos", label: "Conteúdos" },
-];
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const role = (session.user.role as Role) || "SECRETARIA";
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-primary text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="text-lg font-semibold">SME Baraúna — Painel</span>
-          <nav className="flex items-center gap-4 text-sm">
-            <Link href="/" className="hover:underline">Portal</Link>
-            <Link href="/indicadores" className="hover:underline">Indicadores</Link>
-            <SignOutLink />
-          </nav>
-        </div>
-        <nav className="mx-auto flex max-w-6xl flex-wrap gap-4 px-6 pb-3 text-sm">
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:underline">
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
-    </div>
+    <AppShell
+      user={{
+        name: session.user.name || "Usuário",
+        email: session.user.email || "",
+        role: role,
+      }}
+    >
+      {children}
+    </AppShell>
   );
 }

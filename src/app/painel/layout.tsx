@@ -1,23 +1,38 @@
-import Link from "next/link";
-import { SignOutLink } from "../SignOutLink";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/server/auth";
+import { AppShell } from "@/components/layout/AppShell";
+import { Role } from "@/core/auth/roles";
+import { prisma } from "@/server/db";
 
-export default function PainelLayout({ children }: { children: React.ReactNode }) {
+export default async function PainelLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const role = (session.user.role as Role) || "ESCOLA";
+  let schoolName: string | undefined = undefined;
+
+  if (session.user.schoolId) {
+    const school = await prisma.school.findUnique({
+      where: { id: session.user.schoolId },
+      select: { name: true },
+    }).catch(() => null);
+    schoolName = school?.name;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-primary text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="text-lg font-semibold">SME Baraúna — Painel</span>
-          <nav className="flex flex-wrap items-center gap-4 text-sm">
-            <Link href="/painel" className="hover:underline">Início</Link>
-            <Link href="/painel/lancamento" className="hover:underline">Lançamento</Link>
-            <Link href="/painel/validar" className="hover:underline">Validar</Link>
-            <Link href="/indicadores" className="hover:underline">Indicadores</Link>
-            <Link href="/" className="hover:underline">Portal</Link>
-            <SignOutLink />
-          </nav>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl px-6 py-10">{children}</div>
-    </div>
+    <AppShell
+      user={{
+        name: session.user.name || "Usuário",
+        email: session.user.email || "",
+        role: role,
+        schoolName: schoolName,
+      }}
+    >
+      {children}
+    </AppShell>
   );
 }

@@ -2,6 +2,8 @@ import { prisma } from "@/server/db";
 import { AuthContext, assertSchoolScope, assertCanWriteIndicators } from "@/core/auth/permissions";
 import { scoreObjectiveResult, SPADEB_GOAL_PERCENTAGE } from "@/core/assessments/scoring";
 import { READING_LEVELS } from "@/core/assessments/readingLevels";
+import { shiftLabel } from "@/core/school/shift";
+import type { Assessment, AssessmentAnswerKey, AssessmentProgram, AssessmentResult, Class, School } from "@prisma/client";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -136,31 +138,38 @@ export async function recordReadingLevel(
   });
 }
 
-/** Agregação por escola para o dashboard de indicadores (/indicadores) — um gráfico por avaliação. */
-export async function getAssessmentSummaryBySchool(assessmentId: string) {
-  const assessment = await prisma.assessment.findUniqueOrThrow({
-    where: { id: assessmentId },
-    include: { program: true },
-  });
+type ResultWithClass = AssessmentResult & { class: Class & { school: School } };
 
-  const results = await prisma.assessmentResult.findMany({
-    where: { assessmentId, participated: true },
-    include: { class: { include: { school: true } } },
-  });
+type GroupKey = { id: string; label: string };
 
-  const bySchool = new Map<string, { schoolName: string; results: typeof results }>();
+/** Agrupa por escola — visão de rede (Secretaria/Admin, `/admin/indicadores`). */
+function groupBySchool(r: ResultWithClass): GroupKey {
+  return { id: r.class.schoolId, label: r.class.school.name };
+}
+
+/** Agrupa por turma+turno — visão de uma única escola (`/painel/indicadores`). */
+function groupByClass(r: ResultWithClass): GroupKey {
+  return { id: r.classId, label: `${r.class.name} · ${shiftLabel(r.class.shift)}` };
+}
+
+function computeAssessmentSummary(
+  assessment: Assessment & { program: AssessmentProgram },
+  results: ResultWithClass[],
+  groupOf: (r: ResultWithClass) => GroupKey
+) {
+  const byGroup = new Map<string, { label: string; results: ResultWithClass[] }>();
   for (const r of results) {
-    const key = r.class.schoolId;
-    if (!bySchool.has(key)) bySchool.set(key, { schoolName: r.class.school.name, results: [] });
-    bySchool.get(key)!.results.push(r);
+    const g = groupOf(r);
+    if (!byGroup.has(g.id)) byGroup.set(g.id, { label: g.label, results: [] });
+    byGroup.get(g.id)!.results.push(r);
   }
 
   if (assessment.program.resultType === "OBJECTIVE_SCORE") {
-    const rows = [...bySchool.values()].map(({ schoolName, results }) => {
+    const rows = [...byGroup.values()].map(({ label, results }) => {
       const avgPercentage =
         results.reduce((sum, r) => sum + Number(r.percentage ?? 0), 0) / (results.length || 1);
       return {
-        schoolName,
+        label,
         studentCount: results.length,
         avgPercentage: Math.round(avgPercentage * 100) / 100,
         abaixoDoBasico: results.filter((r) => r.classification === "Abaixo do Básico").length,
@@ -172,37 +181,50 @@ export async function getAssessmentSummaryBySchool(assessmentId: string) {
     return { assessment, resultType: "OBJECTIVE_SCORE" as const, rows };
   }
 
-  const rows = [...bySchool.values()].map(({ schoolName, results }) => {
+  const rows = [...byGroup.values()].map(({ label, results }) => {
     const counts: Record<string, number> = {};
     for (const level of READING_LEVELS) counts[level.code] = 0;
     for (const r of results) {
       if (r.readingLevel && counts[r.readingLevel] !== undefined) counts[r.readingLevel]++;
     }
-    return { schoolName, studentCount: results.length, ...counts };
+    return { label, studentCount: results.length, ...counts };
   });
   return { assessment, resultType: "READING_LEVEL" as const, rows };
 }
 
-/**
- * Visão geral do programa inteiro (todas as avaliações), para o dashboard
- * de indicadores (/indicadores) quando "Todas as avaliações" é selecionado —
- * réplica das fórmulas do painel SPADEB legado (smebaraunarn.com/avaliacoes):
- * média geral = média dos percentuais individuais ÷ 10; média global =
- * total de acertos ÷ total de questões aplicadas; níveis pelos mesmos
- * limiares de src/core/assessments/scoring.ts.
- */
-export async function getProgramOverview(programId: string) {
-  const program = await prisma.assessmentProgram.findUniqueOrThrow({ where: { id: programId } });
-  const assessments = await prisma.assessment.findMany({
-    where: { programId },
-    include: { answerKeys: true },
+/** Agregação por escola para o dashboard de indicadores da Secretaria (`/admin/indicadores`). */
+export async function getAssessmentSummaryBySchool(assessmentId: string) {
+  const assessment = await prisma.assessment.findUniqueOrThrow({
+    where: { id: assessmentId },
+    include: { program: true },
   });
-  const assessmentIds = assessments.map((a) => a.id);
-
-  const allResults = await prisma.assessmentResult.findMany({
-    where: { assessmentId: { in: assessmentIds } },
+  const results = await prisma.assessmentResult.findMany({
+    where: { assessmentId, participated: true },
     include: { class: { include: { school: true } } },
   });
+  return computeAssessmentSummary(assessment, results, groupBySchool);
+}
+
+/** Mesma agregação, mas restrita a uma escola e agrupada por turma+turno (`/painel/indicadores`). */
+export async function getAssessmentSummaryForSchool(ctx: AuthContext, schoolId: string, assessmentId: string) {
+  assertSchoolScope(ctx, schoolId);
+  const assessment = await prisma.assessment.findUniqueOrThrow({
+    where: { id: assessmentId },
+    include: { program: true },
+  });
+  const results = await prisma.assessmentResult.findMany({
+    where: { assessmentId, participated: true, schoolId },
+    include: { class: { include: { school: true } } },
+  });
+  return computeAssessmentSummary(assessment, results, groupByClass);
+}
+
+function computeProgramOverview(
+  program: AssessmentProgram,
+  assessments: (Assessment & { answerKeys: AssessmentAnswerKey[] })[],
+  allResults: ResultWithClass[],
+  groupOf: (r: ResultWithClass) => GroupKey
+) {
   const results = allResults.filter((r) => r.participated);
 
   const totalStudents = allResults.length;
@@ -239,7 +261,7 @@ export async function getProgramOverview(programId: string) {
     let sumCorrectMat = 0;
     let sumQuestionsMat = 0;
     const classification = { abaixoDoBasico: 0, basico: 0, proficiente: 0, avancado: 0 };
-    const bySchool = new Map<string, { name: string; sumPct: number; count: number }>();
+    const byGroup = new Map<string, { label: string; sumPct: number; count: number }>();
     const byGrade = new Map<string, { sumPct: number; count: number }>();
 
     for (const r of results) {
@@ -258,21 +280,21 @@ export async function getProgramOverview(programId: string) {
       else if (r.classification === "Proficiente") classification.proficiente++;
       else if (r.classification === "Avançado") classification.avancado++;
 
-      const schoolId = r.class.schoolId;
-      const school = bySchool.get(schoolId) ?? { name: r.class.school.name, sumPct: 0, count: 0 };
-      school.sumPct += Number(r.percentage ?? 0);
-      school.count++;
-      bySchool.set(schoolId, school);
+      const g = groupOf(r);
+      const group = byGroup.get(g.id) ?? { label: g.label, sumPct: 0, count: 0 };
+      group.sumPct += Number(r.percentage ?? 0);
+      group.count++;
+      byGroup.set(g.id, group);
 
       const grade = r.class.grade;
-      const g = byGrade.get(grade) ?? { sumPct: 0, count: 0 };
-      g.sumPct += Number(r.percentage ?? 0);
-      g.count++;
-      byGrade.set(grade, g);
+      const gr = byGrade.get(grade) ?? { sumPct: 0, count: 0 };
+      gr.sumPct += Number(r.percentage ?? 0);
+      gr.count++;
+      byGrade.set(grade, gr);
     }
 
-    const schoolRanking = [...bySchool.values()]
-      .map((s) => ({ schoolName: s.name, avgScore: round2(s.count ? s.sumPct / s.count / 10 : 0) }))
+    const groupRanking = [...byGroup.values()]
+      .map((g) => ({ label: g.label, avgScore: round2(g.count ? g.sumPct / g.count / 10 : 0) }))
       .sort((a, b) => b.avgScore - a.avgScore);
 
     const gradePerformance = [...byGrade.entries()]
@@ -292,7 +314,7 @@ export async function getProgramOverview(programId: string) {
         matematica: round2(sumQuestionsMat ? (sumCorrectMat / sumQuestionsMat) * 100 : 0),
       },
       classification,
-      schoolRanking,
+      groupRanking,
       gradePerformance,
     };
   }
@@ -312,6 +334,52 @@ export async function getProgramOverview(programId: string) {
     participationRate: round2(totalStudents ? (participatedCount / totalStudents) * 100 : 0),
     levelCounts,
   };
+}
+
+/**
+ * Visão geral do programa inteiro (todas as avaliações), para o dashboard
+ * de indicadores da Secretaria (`/admin/indicadores`) — réplica das fórmulas
+ * do painel SPADEB legado (smebaraunarn.com/avaliacoes): média geral =
+ * média dos percentuais individuais ÷ 10; média global = total de acertos ÷
+ * total de questões aplicadas; níveis pelos mesmos limiares de
+ * src/core/assessments/scoring.ts.
+ */
+export async function getProgramOverview(programId: string) {
+  const program = await prisma.assessmentProgram.findUniqueOrThrow({ where: { id: programId } });
+  const assessments = await prisma.assessment.findMany({
+    where: { programId },
+    include: { answerKeys: true },
+  });
+  const assessmentIds = assessments.map((a) => a.id);
+
+  const allResults = await prisma.assessmentResult.findMany({
+    where: { assessmentId: { in: assessmentIds } },
+    include: { class: { include: { school: true } } },
+  });
+
+  return computeProgramOverview(program, assessments, allResults, groupBySchool);
+}
+
+/**
+ * Mesma visão geral, mas restrita a uma escola (`ctx.schoolId` para o papel
+ * ESCOLA) e agrupada por turma+turno em vez de por escola — usada em
+ * `/painel/indicadores`.
+ */
+export async function getProgramOverviewForSchool(ctx: AuthContext, schoolId: string, programId: string) {
+  assertSchoolScope(ctx, schoolId);
+  const program = await prisma.assessmentProgram.findUniqueOrThrow({ where: { id: programId } });
+  const assessments = await prisma.assessment.findMany({
+    where: { programId },
+    include: { answerKeys: true },
+  });
+  const assessmentIds = assessments.map((a) => a.id);
+
+  const allResults = await prisma.assessmentResult.findMany({
+    where: { assessmentId: { in: assessmentIds }, schoolId },
+    include: { class: { include: { school: true } } },
+  });
+
+  return computeProgramOverview(program, assessments, allResults, groupByClass);
 }
 
 /** Avaliações com resultados lançados para a escola, e se já foram validadas — usado em /painel/validar. */

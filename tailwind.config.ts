@@ -1,8 +1,7 @@
 import type { Config } from "tailwindcss";
 
-// Paleta institucional (verde/azul/branco), mesma identidade do projeto
-// legado — ver docs/ARCHITECTURE.md, seção "Design system".
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/app/**/*.{ts,tsx}",
     "./src/components/**/*.{ts,tsx}",
@@ -10,16 +9,36 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        background: "hsl(var(--background) / <alpha-value>)",
+        surface: {
+          DEFAULT: "hsl(var(--surface) / <alpha-value>)",
+          subtle: "hsl(var(--surface-subtle) / <alpha-value>)",
+        },
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        "muted-foreground": "hsl(var(--muted-foreground) / <alpha-value>)",
+        border: "hsl(var(--border) / <alpha-value>)",
         primary: {
-          DEFAULT: "#16a34a", // verde institucional
-          dark: "#15803d",
-          light: "#dcfce7",
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          hover: "hsl(var(--primary-hover) / <alpha-value>)",
+          soft: "hsl(var(--primary-soft) / <alpha-value>)",
         },
         secondary: {
-          DEFAULT: "#2563eb", // azul institucional
-          dark: "#1d4ed8",
-          light: "#dbeafe",
+          DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
+          soft: "hsl(var(--secondary-soft) / <alpha-value>)",
         },
+        accent: "hsl(var(--accent) / <alpha-value>)",
+        success: "hsl(var(--success) / <alpha-value>)",
+        warning: "hsl(var(--warning) / <alpha-value>)",
+        danger: "hsl(var(--danger) / <alpha-value>)",
+        info: "hsl(var(--info) / <alpha-value>)",
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      transitionDuration: {
+        DEFAULT: "180ms",
       },
     },
   },
