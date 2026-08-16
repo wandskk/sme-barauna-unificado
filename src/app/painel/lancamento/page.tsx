@@ -66,6 +66,12 @@ export default async function LancamentoPage({
             </button>
           </form>
         )}
+
+        <p className="mt-4 text-sm">
+          <Link href="/painel/lancamento/importar" className="text-primary underline">
+            Prefere importar uma planilha (.xlsx)?
+          </Link>
+        </p>
       </main>
     );
   }
@@ -95,8 +101,16 @@ export default async function LancamentoPage({
       <h1 className="mb-1 text-xl font-semibold text-slate-900">
         {assessment.program.name} · {assessment.name}
       </h1>
-      <p className="mb-6 text-sm text-slate-500">
+      <p className="mb-2 text-sm text-slate-500">
         {klass.school.name} · {klass.name}
+      </p>
+      <p className="mb-6 text-sm">
+        <Link
+          href={`/painel/lancamento/importar?assessmentId=${assessmentId}&classId=${classId}`}
+          className="text-primary underline"
+        >
+          Importar via planilha (.xlsx)
+        </Link>
       </p>
 
       {students.length === 0 ? (
