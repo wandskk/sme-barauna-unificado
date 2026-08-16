@@ -8,7 +8,7 @@ export default async function PainelPage() {
 
   if (ctx.role !== "ESCOLA" || !ctx.schoolId) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="max-w-3xl">
         <p className="mb-4 text-sm text-slate-600">
           Esta área é destinada aos usuários do papel Escola. Você está logado como{" "}
           {ctx.role === "SECRETARIA" ? "Secretaria" : "Administrador"} —{" "}
@@ -30,7 +30,7 @@ export default async function PainelPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="max-w-3xl">
       <h1 className="mb-1 text-xl font-semibold text-slate-900">{school.name}</h1>
       <p className="mb-6 text-sm text-slate-500">
         {school.type ?? "—"} · {school.zone === "urbana" ? "Urbana" : "Rural"}

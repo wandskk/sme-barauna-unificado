@@ -15,7 +15,7 @@ export default async function LancamentoPage({
 
   if (ctx.role === "ESCOLA") {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="max-w-3xl">
         <p className="text-sm text-slate-600">
           O lançamento de indicadores é feito pela Secretaria/Administrador. Sua escola pode{" "}
           <Link href="/painel/validar" className="text-primary underline">
@@ -36,7 +36,7 @@ export default async function LancamentoPage({
 
   if (!assessmentId || !classId) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-10">
+      <main className="max-w-2xl">
         <h1 className="mb-6 text-xl font-semibold text-slate-900">Lançamento de indicadores</h1>
 
         {assessments.length === 0 || classes.length === 0 ? (
@@ -80,7 +80,7 @@ export default async function LancamentoPage({
   const klass = classes.find((c) => c.id === classId);
   if (!assessment || !klass) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-10">
+      <main className="max-w-2xl">
         <p className="text-sm text-red-600">Avaliação ou turma não encontrada.</p>
         <Link href="/painel/lancamento" className="text-sm text-primary underline">Voltar</Link>
       </main>
@@ -97,7 +97,7 @@ export default async function LancamentoPage({
   const isObjective = assessment.program.resultType === "OBJECTIVE_SCORE";
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
+    <main className="max-w-4xl">
       <h1 className="mb-1 text-xl font-semibold text-slate-900">
         {assessment.program.name} · {assessment.name}
       </h1>

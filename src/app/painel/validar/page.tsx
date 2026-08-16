@@ -7,7 +7,7 @@ export default async function ValidarPage() {
 
   if (ctx.role !== "ESCOLA" || !ctx.schoolId) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="max-w-3xl">
         <p className="text-sm text-slate-600">
           Esta tela é destinada aos usuários do papel Escola confirmarem os indicadores lançados
           pela Secretaria.
@@ -20,7 +20,7 @@ export default async function ValidarPage() {
   const items = await listAssessmentsForValidation(ctx, schoolId).catch(() => []);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main className="max-w-3xl">
       <h1 className="mb-1 text-xl font-semibold text-slate-900">Validação de indicadores</h1>
       <p className="mb-6 text-sm text-slate-500">
         Confirme que os dados lançados pela Secretaria para sua escola estão corretos.

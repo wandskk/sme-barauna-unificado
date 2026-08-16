@@ -20,7 +20,7 @@ export default async function ImportarResultadosPage({
 
   if (ctx.role === "ESCOLA") {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="max-w-3xl">
         <p className="text-sm text-slate-600">
           A importação de planilhas é feita pela Secretaria/Administrador.
         </p>
@@ -42,7 +42,7 @@ export default async function ImportarResultadosPage({
   const errorCount = searchParams.errorCount ? Number(searchParams.errorCount) : 0;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="max-w-2xl">
       <h1 className="mb-1 text-xl font-semibold text-slate-900">Importar resultados via planilha</h1>
       <p className="mb-6 text-sm text-slate-500">
         Alternativa ao{" "}

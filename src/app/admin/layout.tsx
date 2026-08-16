@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignOutLink } from "../SignOutLink";
 
 const NAV = [
   { href: "/admin", label: "Início" },
@@ -18,9 +19,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="border-b bg-primary text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <span className="text-lg font-semibold">SME Baraúna — Painel</span>
-          <Link href="/" className="text-sm underline">
-            Ver portal
-          </Link>
+          <nav className="flex items-center gap-4 text-sm">
+            <Link href="/" className="hover:underline">Portal</Link>
+            <Link href="/indicadores" className="hover:underline">Indicadores</Link>
+            <SignOutLink />
+          </nav>
         </div>
         <nav className="mx-auto flex max-w-6xl flex-wrap gap-4 px-6 pb-3 text-sm">
           {NAV.map((item) => (
