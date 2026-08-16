@@ -248,7 +248,7 @@ model AssessmentResult {
   totalCorrect      Int?
   totalQuestions    Int?
   percentage        Decimal? @db.Decimal(5, 2)
-  classification    String?  // "Abaixo do Básico" | "Proficiente" | "Avançado"
+  classification    String?  // "Abaixo do Básico" | "Básico" | "Proficiente" | "Avançado"
   answers           Json?
 
   // --- campo usado quando program.resultType = READING_LEVEL ---

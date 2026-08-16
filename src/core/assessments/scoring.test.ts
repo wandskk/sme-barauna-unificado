@@ -7,13 +7,18 @@ describe("classify", () => {
     expect(classify(40)).toBe("Abaixo do Básico");
   });
 
-  it("classifica como Proficiente entre 40% (exclusive) e 60%", () => {
-    expect(classify(41)).toBe("Proficiente");
-    expect(classify(60)).toBe("Proficiente");
+  it("classifica como Básico entre 40% (exclusive) e 60%", () => {
+    expect(classify(41)).toBe("Básico");
+    expect(classify(60)).toBe("Básico");
   });
 
-  it("classifica como Avançado acima de 60%", () => {
-    expect(classify(61)).toBe("Avançado");
+  it("classifica como Proficiente entre 60% (exclusive) e 80%", () => {
+    expect(classify(61)).toBe("Proficiente");
+    expect(classify(80)).toBe("Proficiente");
+  });
+
+  it("classifica como Avançado acima de 80%", () => {
+    expect(classify(81)).toBe("Avançado");
     expect(classify(100)).toBe("Avançado");
   });
 });

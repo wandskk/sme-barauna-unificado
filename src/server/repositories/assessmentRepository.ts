@@ -158,6 +158,7 @@ export async function getAssessmentSummaryBySchool(assessmentId: string) {
         studentCount: results.length,
         avgPercentage: Math.round(avgPercentage * 100) / 100,
         abaixoDoBasico: results.filter((r) => r.classification === "Abaixo do Básico").length,
+        basico: results.filter((r) => r.classification === "Básico").length,
         proficiente: results.filter((r) => r.classification === "Proficiente").length,
         avancado: results.filter((r) => r.classification === "Avançado").length,
       };

@@ -17,6 +17,7 @@ type ObjectiveRow = {
   studentCount: number;
   avgPercentage: number;
   abaixoDoBasico: number;
+  basico: number;
   proficiente: number;
   avancado: number;
 };
@@ -49,7 +50,8 @@ export function ObjectiveScoreChart({ rows }: { rows: ObjectiveRow[] }) {
             <Tooltip />
             <Legend />
             <Bar dataKey="abaixoDoBasico" name="Abaixo do Básico" stackId="c" fill="#dc2626" />
-            <Bar dataKey="proficiente" name="Proficiente" stackId="c" fill="#2563eb" />
+            <Bar dataKey="basico" name="Básico" stackId="c" fill="#f97316" />
+            <Bar dataKey="proficiente" name="Proficiente" stackId="c" fill="#eab308" />
             <Bar dataKey="avancado" name="Avançado" stackId="c" fill="#16a34a" />
           </BarChart>
         </ResponsiveContainer>
